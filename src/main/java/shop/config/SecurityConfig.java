@@ -17,7 +17,7 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
 
     private static final String ADMIN_ENDPOINT = "admin/**";
     private static final String LOGIN_ENDPOINT = "login";
-    private static final String REGISTRATION_ENDPOINT = "login";
+    private static final String REGISTRATION_ENDPOINT = "reg";
 
     @Bean
     @Override
@@ -36,12 +36,12 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
                 sessionCreationPolicy(SessionCreationPolicy.STATELESS).
                 and().
                 authorizeRequests().
-//                antMatchers(LOGIN_ENDPOINT).
-//                permitAll().
-//                antMatchers(REGISTRATION_ENDPOINT).
-//                permitAll().
-//                antMatchers(ADMIN_ENDPOINT).
-//                hasRole("ADMIN").
+                antMatchers(LOGIN_ENDPOINT).
+                permitAll().
+                antMatchers(REGISTRATION_ENDPOINT).
+                permitAll().
+                antMatchers(ADMIN_ENDPOINT).
+                hasRole("ADMIN").
                 anyRequest().
                 permitAll().
                 and().

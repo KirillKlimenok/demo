@@ -2,6 +2,7 @@ package shop.service.impl;
 
 import shop.dto.RegistrationResponseDto;
 import shop.dto.RoleResponseDto;
+import shop.exception.UserNotFoundException;
 import shop.model.Role;
 import shop.model.Status;
 import shop.model.User;
@@ -35,18 +36,25 @@ public class UserServiceImpl implements UserService {
         Role role = roleRepository.
                 findAll().
                 filter(x -> x.getName().equals("ROLE_USER")).
+                switchIfEmpty(Mono.error(new NullPointerException("role list empty"))).
                 next().
                 block();
 
         UserRole userRole = new UserRole();
-        User currentUser = configureUser(role, user, userRole);
         RoleResponseDto roleResponseDto = new RoleResponseDto(role.getName());
+        User currentUser = configureUser(user);
 
-        userRepository.save(currentUser).block();
+        userRepository.
+                save(currentUser).
+                block();
 
-        User userInDb = userRepository.findByLogin(currentUser.getLogin()).block();
+        User userInDb = userRepository.
+                findByLogin(currentUser.getLogin()).
+                switchIfEmpty(Mono.error(new UserNotFoundException("user nowt found: " + currentUser.getLogin()))).
+                block();
 
-        userRole.setUserId(userInDb.getId());
+        setUserRoleValues(userRole, role, currentUser.getCreated(), userInDb.getId());
+
         userRoleRepository.save(userRole).subscribe();
 
         log.info("user: {} created", currentUser);
@@ -55,11 +63,8 @@ public class UserServiceImpl implements UserService {
         return new RegistrationResponseDto(user.getLogin(), List.of(roleResponseDto));
     }
 
-    private User configureUser(Role role, User user, UserRole userRole) {
+    private User configureUser(User user) {
         LocalDateTime date = LocalDateTime.now();
-        UUID userId = UUID.randomUUID();
-
-        setUserRoleValues(userRole, role, date, userId);
 
         user.setId(null);
         user.setStatus(Status.ACTIVE);
