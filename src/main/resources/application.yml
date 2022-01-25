@@ -1,0 +1,22 @@
+server:
+  port: 8081
+
+logging:
+  level:
+    io.r2dbc.postgresql.QUERY: DEBUG # for queries
+    io.r2dbc.postgresql.PARAM: DEBUG # for parameters
+spring:
+  r2dbc:
+    url: r2dbc:postgresql://localhost:5432/beer_shop_with_spring_two
+    username: postgres
+    password: 22k67s4A
+  datasource:
+    url: jdbc:postgresql://localhost:5432/beer_shop_with_spring_two
+    driver-class-name: org.postgresql.Driver
+    username: postgres
+    password: 22k67s4A
+  liquibase:
+    change-log: classpath:liquibase/db.changelog-master.xml
+    url: jdbc:postgresql://localhost:5432/beer_shop_with_spring_two
+    user: postgres
+    password: 22k67s4A
