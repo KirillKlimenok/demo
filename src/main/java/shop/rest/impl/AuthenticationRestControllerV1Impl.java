@@ -1,55 +1,51 @@
 package shop.rest.impl;
 
-import shop.dto.AuthenticationRequestDto;
-import shop.dto.AuthenticationResponseDto;
-import shop.model.Role;
-import shop.model.User;
-import shop.rest.AuthenticationRestControllerV1;
-import shop.security.jwt.JwtTokenProvider;
-import shop.service.UserService;
-import liquibase.pro.packaged.A;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.stereotype.Component;
 import org.springframework.web.bind.annotation.RequestBody;
-import reactor.core.publisher.Flux;
+import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
+import shop.config.JwtUtil;
+import shop.dto.AuthenticationResponseDto;
+import shop.model.UserAndRole;
+import shop.rest.AuthenticationRestControllerV1;
+import shop.service.UserService;
 
-import java.util.Arrays;
-import java.util.List;
 import java.util.Objects;
 
 @Component
 @RequiredArgsConstructor
 public class AuthenticationRestControllerV1Impl implements AuthenticationRestControllerV1 {
-    private final AuthenticationManager authenticationManager;
-    private final JwtTokenProvider jwtTokenProvider;
     private final UserService userService;
+    private final JwtUtil jwtUtil;
 
     @Override
-    public AuthenticationResponseDto login(@RequestBody AuthenticationRequestDto requestDto) {
+    public Mono<ResponseEntity> login(@RequestBody ServerWebExchange serverWebExchange) {
         try {
-            String login = requestDto.getLogin();
-            authenticationManager.authenticate(new UsernamePasswordAuthenticationToken(login, requestDto.getPassword()));
-            Mono<User> user = userService.findByLogin(login);
+            return serverWebExchange.getFormData().flatMap(credentials -> userService
+                    .findByLogin(credentials.getFirst("username"))
+                    .cast(UserAndRole.class)
+                    .map(userDetails -> {
+                        if (Objects.equals(
+                                credentials.getFirst("password"),
+                                userDetails.getUser().getPassword())) {
+                            return ResponseEntity.ok(AuthenticationResponseDto.builder()
+                                    .login(userDetails.getUsername())
+                                    .token(jwtUtil.generateToken(userDetails))
+                                    .build());
+                        } else {
+                            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+                        }
+                    })
+            );
 
-            if (user == null) {
-                throw new BadCredentialsException("Invalid username or password");
-            }
-
-//            Flux<Role> roleFlux = user
-//                    .filter(Objects::nonNull)
-//                    .flatMapMany(x -> Flux.fromArray(x.toArray(new Role[2])));
-
-//            String token = jwtTokenProvider.createToken(login, roleFlux);
-
-            return new AuthenticationResponseDto(login, "token");
         } catch (AuthenticationException e) {
-            throw new BadCredentialsException("Invalid username or password");
+            return Mono.just(ResponseEntity.status(HttpStatus.UNAUTHORIZED).build());
         }
     }
 }

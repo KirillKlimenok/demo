@@ -20,3 +20,5 @@ spring:
     url: jdbc:postgresql://localhost:5432/beer_shop_with_spring_two
     user: postgres
     password: 22k67s4A
+  main:
+    allow-bean-definition-overriding: true
