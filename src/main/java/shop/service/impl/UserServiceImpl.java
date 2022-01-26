@@ -1,13 +1,14 @@
 package shop.service.impl;
 
-import reactor.core.Disposable;
-import reactor.core.Disposables;
-import reactor.core.scheduler.Scheduler;
-import reactor.core.scheduler.Schedulers;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.stereotype.Service;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 import shop.dto.RegistrationResponseDto;
 import shop.dto.RoleResponseDto;
 import shop.exception.UserNotFoundException;
-import shop.model.Role;
 import shop.model.Status;
 import shop.model.User;
 import shop.model.UserAndRole;
@@ -16,12 +17,6 @@ import shop.repository.RoleRepository;
 import shop.repository.UserRepository;
 import shop.repository.UserRoleRepository;
 import shop.service.UserService;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
-import org.springframework.stereotype.Service;
-import reactor.core.publisher.Flux;
-import reactor.core.publisher.Mono;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -44,9 +39,21 @@ public class UserServiceImpl implements UserService {
                 switchIfEmpty(Mono.error(new NullPointerException("role list empty"))).
                 next().
                 map(role -> {
-                    User currentUser = configureUser(user).build();
+                    LocalDateTime date = LocalDateTime.now();
 
-                    userRepository.save(currentUser).subscribe();
+                    User currentUser = User
+                            .builder()
+                            .id(null)
+                            .login(user.getLogin())
+                            .email(user.getEmail())
+                            .password(passwordEncoder.encode(user.getPassword()))
+                            .created(date)
+                            .updated(date)
+                            .status(Status.ACTIVE)
+                            .build();
+
+                    userRepository
+                            .save(currentUser).subscribe();
 
                     return new UserAndRole(currentUser, role);
                 }).
@@ -59,14 +66,27 @@ public class UserServiceImpl implements UserService {
                             return userAndRole;
                         })).
                 map(userAndRole -> {
-                    UserRole userRole = setUserRoleValues(userAndRole.getRole(), userAndRole.getUser().getCreated(), userAndRole.getUser().getId())
+                    userRoleRepository.save(
+                            UserRole
+                                    .builder()
+                                    .roleId(userAndRole.getRole().getId())
+                                    .userId(userAndRole.getUser().getId())
+                                    .created(userAndRole.getUser().getCreated())
+                                    .updated(userAndRole.getUser().getUpdated())
+                                    .status(Status.ACTIVE)
+                                    .build()
+                    );
+
+                    return RegistrationResponseDto
+                            .builder()
+                            .login(user.getLogin())
+                            .roleList(List.of(RoleResponseDto
+                                    .builder()
+                                    .name(userAndRole
+                                            .getRole()
+                                            .getName())
+                                    .build()))
                             .build();
-
-                    RoleResponseDto roleResponseDto = new RoleResponseDto(userAndRole.getRole().getName());
-
-                    userRoleRepository.save(userRole).subscribe();
-
-                    return new RegistrationResponseDto(user.getLogin(), List.of(roleResponseDto));
                 }).
                 doOnNext(x -> {
                     log.info("user: {} created", x.getLogin());
@@ -83,16 +103,6 @@ public class UserServiceImpl implements UserService {
                 .login(user.getLogin())
                 .email(user.getEmail())
                 .password(passwordEncoder.encode(user.getPassword()))
-                .created(date)
-                .updated(date)
-                .status(Status.ACTIVE);
-    }
-
-    private UserRole.UserRoleBuilder setUserRoleValues(Role role, LocalDateTime date, UUID userId) {
-        return UserRole
-                .builder()
-                .roleId(role.getId())
-                .userId(userId)
                 .created(date)
                 .updated(date)
                 .status(Status.ACTIVE);
