@@ -6,6 +6,7 @@ import shop.exception.UserNotFoundException;
 import shop.model.Role;
 import shop.model.Status;
 import shop.model.User;
+import shop.model.UserAndRole;
 import shop.model.UserRole;
 import shop.repository.RoleRepository;
 import shop.repository.UserRepository;
@@ -37,26 +38,33 @@ public class UserServiceImpl implements UserService {
                 findAll().
                 filter(x -> x.getName().equals("ROLE_USER")).
                 switchIfEmpty(Mono.error(new NullPointerException("role list empty"))).
-                next().map(role1 -> {
-                    RoleResponseDto roleResponseDto = new RoleResponseDto(role1.getName());
+                next().
+                map(role -> {
                     User currentUser = configureUser(user).build();
 
-                    userRepository.
-                            save(currentUser).
-                            block();
+                    userRepository.save(currentUser).subscribe();
 
-                    User userInDb = userRepository.
-                            findByLogin(currentUser.getLogin()).
-                            switchIfEmpty(Mono.error(new UserNotFoundException("user nowt found: " + currentUser.getLogin()))).
-                            block();
-
-                    UserRole userRole = setUserRoleValues(role1, currentUser.getCreated(), userInDb.getId())
+                    return new UserAndRole(currentUser, role);
+                }).
+                flatMap(userAndRole -> userRepository.
+                        findByLogin(userAndRole.getUser().getLogin()).
+                        switchIfEmpty(Mono.
+                                error(new UserNotFoundException("user nowt found: " + userAndRole.getUser().getLogin()))).
+                        map(userInBd -> {
+                            userAndRole.setUser(userInBd);
+                            return userAndRole;
+                        })).
+                map(userAndRole -> {
+                    UserRole userRole = setUserRoleValues(userAndRole.getRole(), userAndRole.getUser().getCreated(), userAndRole.getUser().getId())
                             .build();
+
+                    RoleResponseDto roleResponseDto = new RoleResponseDto(userAndRole.getRole().getName());
 
                     userRoleRepository.save(userRole).subscribe();
 
                     return new RegistrationResponseDto(user.getLogin(), List.of(roleResponseDto));
-                }).doOnNext(x -> {
+                }).
+                doOnNext(x -> {
                     log.info("user: {} created", x.getLogin());
                     log.info("userRole: {} created", x.getRoleList());
                 });

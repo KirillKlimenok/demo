@@ -15,7 +15,6 @@ import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Data
-@SuperBuilder
 @NoArgsConstructor
 @AllArgsConstructor
 @Table(value = "user_role")
