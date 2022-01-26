@@ -9,7 +9,7 @@ import java.util.List;
 import java.util.UUID;
 
 public interface UserService {
-    RegistrationResponseDto save(User user);
+    Mono<RegistrationResponseDto> save(User user);
 
     Flux<User> findAll();
 
@@ -17,5 +17,5 @@ public interface UserService {
 
     Mono<User> findById(UUID id);
 
-    void delete(UUID id);
+    Mono<Void> delete(UUID id);
 }

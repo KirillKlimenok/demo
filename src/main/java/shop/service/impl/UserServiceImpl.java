@@ -32,55 +32,58 @@ public class UserServiceImpl implements UserService {
     private final BCryptPasswordEncoder passwordEncoder;
 
     @Override
-    public RegistrationResponseDto save(User user) {
-        Role role = roleRepository.
+    public Mono<RegistrationResponseDto> save(User user) {
+        return roleRepository.
                 findAll().
                 filter(x -> x.getName().equals("ROLE_USER")).
                 switchIfEmpty(Mono.error(new NullPointerException("role list empty"))).
-                next().
-                block();
+                next().map(role1 -> {
+                    RoleResponseDto roleResponseDto = new RoleResponseDto(role1.getName());
+                    User currentUser = configureUser(user).build();
 
-        UserRole userRole = new UserRole();
-        RoleResponseDto roleResponseDto = new RoleResponseDto(role.getName());
-        User currentUser = configureUser(user);
+                    userRepository.
+                            save(currentUser).
+                            block();
 
-        userRepository.
-                save(currentUser).
-                block();
+                    User userInDb = userRepository.
+                            findByLogin(currentUser.getLogin()).
+                            switchIfEmpty(Mono.error(new UserNotFoundException("user nowt found: " + currentUser.getLogin()))).
+                            block();
 
-        User userInDb = userRepository.
-                findByLogin(currentUser.getLogin()).
-                switchIfEmpty(Mono.error(new UserNotFoundException("user nowt found: " + currentUser.getLogin()))).
-                block();
+                    UserRole userRole = setUserRoleValues(role1, currentUser.getCreated(), userInDb.getId())
+                            .build();
 
-        setUserRoleValues(userRole, role, currentUser.getCreated(), userInDb.getId());
+                    userRoleRepository.save(userRole).subscribe();
 
-        userRoleRepository.save(userRole).subscribe();
-
-        log.info("user: {} created", currentUser);
-        log.info("userRole: {} created", userRole);
-
-        return new RegistrationResponseDto(user.getLogin(), List.of(roleResponseDto));
+                    return new RegistrationResponseDto(user.getLogin(), List.of(roleResponseDto));
+                }).doOnNext(x -> {
+                    log.info("user: {} created", x.getLogin());
+                    log.info("userRole: {} created", x.getRoleList());
+                });
     }
 
-    private User configureUser(User user) {
+    private User.UserBuilder configureUser(User user) {
         LocalDateTime date = LocalDateTime.now();
 
-        user.setId(null);
-        user.setStatus(Status.ACTIVE);
-        user.setPassword(passwordEncoder.encode(user.getPassword()));
-        user.setCreated(date);
-        user.setUpdated(date);
-
-        return user;
+        return User
+                .builder()
+                .id(null)
+                .login(user.getLogin())
+                .email(user.getEmail())
+                .password(passwordEncoder.encode(user.getPassword()))
+                .created(date)
+                .updated(date)
+                .status(Status.ACTIVE);
     }
 
-    private void setUserRoleValues(UserRole userRole, Role role, LocalDateTime date, UUID userId) {
-        userRole.setUserId(userId);
-        userRole.setRoleId(role.getId());
-        userRole.setCreated(date);
-        userRole.setUpdated(date);
-        userRole.setStatus(Status.ACTIVE);
+    private UserRole.UserRoleBuilder setUserRoleValues(Role role, LocalDateTime date, UUID userId) {
+        return UserRole
+                .builder()
+                .roleId(role.getId())
+                .userId(userId)
+                .created(date)
+                .updated(date)
+                .status(Status.ACTIVE);
     }
 
     @Override
@@ -99,7 +102,7 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
-    public void delete(UUID id) {
-        userRepository.deleteById(id);
+    public Mono<Void> delete(UUID id) {
+        return userRepository.deleteById(id).then();
     }
 }

@@ -1,5 +1,6 @@
 package shop.rest;
 
+import reactor.core.publisher.Mono;
 import shop.dto.RegistrationRequestDto;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -13,5 +14,5 @@ import java.util.List;
 @RequestMapping("/reg")
 public interface RegistrationRestController {
     @PostMapping
-    RegistrationResponseDto registration(@RequestBody RegistrationRequestDto registrationRequestDto);
+    Mono<RegistrationResponseDto> registration(@RequestBody RegistrationRequestDto registrationRequestDto);
 }

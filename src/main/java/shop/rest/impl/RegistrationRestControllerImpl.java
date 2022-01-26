@@ -2,6 +2,7 @@ package shop.rest.impl;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
+import reactor.core.publisher.Mono;
 import shop.dto.RegistrationRequestDto;
 import shop.dto.RegistrationResponseDto;
 import shop.mapper.UserMapper;
@@ -15,8 +16,7 @@ public class RegistrationRestControllerImpl implements RegistrationRestControlle
     private final UserMapper userMapper = UserMapper.INSTANCE;
 
     @Override
-    public RegistrationResponseDto registration(RegistrationRequestDto registrationRequestDto) {
-
+    public Mono<RegistrationResponseDto> registration(RegistrationRequestDto registrationRequestDto) {
         return userService.save(userMapper.toModel(registrationRequestDto));
     }
 }
